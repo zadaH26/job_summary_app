@@ -86,11 +86,12 @@ if uploaded_files:
             st.dataframe(job_df_display, use_container_width=True)
 
             # -----------------------------
-            # One-click copy button (numbers only)
+            # One-click copy button (numbers only with spaces)
             # -----------------------------
             numbers_text = ""
             for idx, row in job_df_display.iterrows():
-                numbers_text += f"{row['OVERTIME']:.2f}\t{row['STRAIGHT']:.2f}\n"
+                # 4 spaces between columns for alignment
+                numbers_text += f"{row['OVERTIME']:.2f}    {row['STRAIGHT']:.2f}\n"
             numbers_text = numbers_text.strip()
 
             html_code = f"""
@@ -120,3 +121,4 @@ if uploaded_files:
             file_name="job_summary.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
