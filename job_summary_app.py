@@ -8,7 +8,7 @@ st.title("Job Summary - Exact Copy Layout")
 
 # Sidebar settings
 round_increment = st.sidebar.selectbox("Round hours to:", [0.25, 0.5, 1.0], index=0)
-num_weeks = 3  # number of rows per job
+num_weeks = 3  # default number of rows per job
 
 def round_hours(val):
     try:
@@ -41,14 +41,15 @@ if uploaded_files:
                         text += page.extract_text() + "\n"
 
                 data = []
-                # Match lines like: "901.75 166.91 1152.12 0.00 N/A 1607"
-                pattern = re.compile(r"([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+).*?(\d+)$")
+                # Regex to capture: Regular (STRAIGHT), Overtime, ignore Combined/Other, Job Number at end
+                # e.g., "901.75 166.91 1152.12 0.00 N/A 1607"
+                pattern = re.compile(r"^\s*([0-9\.]+)\s+([0-9\.]+).*?(\d+)\s*$")
                 for line in text.split("\n"):
                     m = pattern.search(line)
                     if m:
                         straight = round_hours(m.group(1))
                         overtime = round_hours(m.group(2))
-                        job = m.group(4)
+                        job = m.group(3)
                         data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
                 df = pd.DataFrame(data)
             else:
@@ -57,7 +58,7 @@ if uploaded_files:
             st.warning(f"Cannot read file {file.name}: {e}")
             continue
 
-        # Standardize column names for Excel/CSV
+        # Standardize column names
         if 'Regular' in df.columns and 'STRAIGHT' not in df.columns:
             df.rename(columns={'Regular':'STRAIGHT'}, inplace=True)
         if 'Overtime' in df.columns and 'OVERTIME' not in df.columns:
@@ -78,7 +79,7 @@ if uploaded_files:
         display_rows = []
 
         # Build rows for num_weeks
-        for w in range(1,num_weeks+1):
+        for w in range(1, num_weeks+1):
             week_name = f"Week {w}"
             if week_name in weeks:
                 display_rows.append(list(weeks[week_name]))
