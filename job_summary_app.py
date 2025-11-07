@@ -3,12 +3,10 @@ import pandas as pd
 import pdfplumber
 import streamlit.components.v1 as components
 
-# -------------------
 # Sidebar settings
-# -------------------
 st.sidebar.header("Settings")
 round_increment = st.sidebar.selectbox("Round hours to:", [0.25, 0.5, 1.0], index=0)
-num_weeks = 3  # always show 3 rows for Week 1-3
+num_weeks = 3  # Always show 3 rows
 
 def round_hours(value, increment):
     try:
@@ -16,9 +14,7 @@ def round_hours(value, increment):
     except:
         return 0.0
 
-# -------------------
-# File uploader
-# -------------------
+# App title
 st.title("Job Summary to Weekly Hours")
 
 uploaded_files = st.file_uploader(
@@ -63,11 +59,8 @@ if uploaded_files:
             st.warning(f"Could not read {file.name}: {e}")
             continue
 
-        # Ensure columns exist
-        if 'STRAIGHT' not in df.columns and 'Regular' in df.columns:
-            df.rename(columns={'Regular':'STRAIGHT'}, inplace=True)
-        if 'OVERTIME' not in df.columns and 'Overtime' in df.columns:
-            df.rename(columns={'Overtime':'OVERTIME'}, inplace=True)
+        # Keep only the relevant columns
+        df = df[['Job Number', 'STRAIGHT', 'OVERTIME']]
 
         # Round values
         df['STRAIGHT'] = df['STRAIGHT'].apply(lambda x: round_hours(x, round_increment))
@@ -83,11 +76,9 @@ if uploaded_files:
         for job in job_numbers:
             st.subheader(f"Job {job}")
 
-            job_df = export_df[export_df['Job Number']==job].copy()
+            job_df = export_df[export_df['Job Number']==job]
 
-            # -----------------------------
-            # Make sure we always have num_weeks rows
-            # -----------------------------
+            # Ensure exactly num_weeks rows
             display_rows = []
             for week_idx in range(1, num_weeks+1):
                 week_name = f"Week {week_idx}"
@@ -100,13 +91,11 @@ if uploaded_files:
                     st_hours = 0.0
                 display_rows.append({"OVERTIME": ot, "STRAIGHT": st_hours})
 
-            job_df_display = pd.DataFrame(display_rows)
+            job_df_display = pd.DataFrame(display_rows, columns=['OVERTIME','STRAIGHT'])
 
             st.dataframe(job_df_display, use_container_width=True)
 
-            # -----------------------------
-            # One-click copy button
-            # -----------------------------
+            # One-click copy button (exactly two numbers per row)
             numbers_text = ""
             for _, row in job_df_display.iterrows():
                 numbers_text += f"{row['OVERTIME']:.2f}    {row['STRAIGHT']:.2f}\n"
@@ -123,9 +112,7 @@ if uploaded_files:
             """
             components.html(html_code, height=50)
 
-        # -----------------------------
         # Export buttons
-        # -----------------------------
         st.download_button(
             label="⬇️ Download as CSV",
             data=export_df.to_csv(index=False).encode("utf-8"),
