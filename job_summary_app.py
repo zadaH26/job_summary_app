@@ -38,17 +38,23 @@ if uploaded_files:
                 with pdfplumber.open(file) as pdf:
                     for page in pdf.pages:
                         text += page.extract_text() + "\n"
+
                 data = []
                 for line in text.split("\n"):
                     parts = line.strip().split()
-                    if len(parts) >= 3:
-                        try:
-                            job = parts[0]
-                            straight = round_hours(parts[1])
-                            overtime = round_hours(parts[2])
-                            data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
-                        except:
+                    if len(parts) < 3:
+                        continue
+                    # Only keep rows where first 3 parts are numbers
+                    try:
+                        job = parts[-1]  # last element is job number in your PDFs
+                        straight = round_hours(parts[0])
+                        overtime = round_hours(parts[1])
+                        # Skip rows with zeros for both (like totals or empty)
+                        if straight == 0.0 and overtime == 0.0:
                             continue
+                        data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
+                    except:
+                        continue
                 df = pd.DataFrame(data)
             else:
                 continue
@@ -62,14 +68,21 @@ if uploaded_files:
             df.rename(columns={'Overtime':'OVERTIME'}, inplace=True)
 
         for _, row in df.iterrows():
-            job = str(row['Job Number'] if 'Job Number' in row else row['Job'])
-            straight = round_hours(row['STRAIGHT'])
-            overtime = round_hours(row['OVERTIME'])
+            try:
+                job = str(row['Job Number'] if 'Job Number' in row else row['Job'])
+                straight = round_hours(row['STRAIGHT'])
+                overtime = round_hours(row['OVERTIME'])
+                # Skip rows where job is empty or non-numeric
+                if job.strip() == "" or (straight == 0.0 and overtime == 0.0):
+                    continue
+            except:
+                continue
 
             if job not in jobs:
                 jobs[job] = {}
             jobs[job][week_name] = (overtime, straight)
 
+    # Display
     for job, weeks in jobs.items():
         st.subheader(f"Job {job}")
         display_rows = []
