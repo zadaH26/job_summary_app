@@ -90,16 +90,14 @@ if uploaded_files:
             # -----------------------------
             numbers_text = ""
             for idx, row in job_df_display.iterrows():
-                # 4 spaces between columns for alignment
                 numbers_text += f"{row['OVERTIME']:.2f}    {row['STRAIGHT']:.2f}\n"
             numbers_text = numbers_text.strip()
 
             html_code = f"""
-            <input type="text" value="{numbers_text}" id="copyInput{job}" style="position:absolute; left:-1000px; top:-1000px;">
+            <textarea id="copyInput{job}" style="position:absolute; left:-1000px; top:-1000px;">{numbers_text}</textarea>
             <button onclick="
                 var copyText = document.getElementById('copyInput{job}');
                 copyText.select();
-                copyText.setSelectionRange(0, 99999);
                 navigator.clipboard.writeText(copyText.value);
                 alert('Copied to clipboard!');
             ">📋 Copy Numbers</button>
@@ -121,4 +119,3 @@ if uploaded_files:
             file_name="job_summary.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
