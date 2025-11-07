@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import pdfplumber
 import streamlit.components.v1 as components
-import re
 
 st.title("Job Summary - Exact Copy Layout")
 
@@ -40,19 +39,17 @@ if uploaded_files:
                     for page in pdf.pages:
                         text = page.extract_text()
                         for line in text.split("\n"):
-                            line = line.strip()
-                            # Only parse lines ending with job number
-                            match = re.match(r'^(.*?)\s+(\d{3,5})$', line)
-                            if match:
-                                numbers_part = match.group(1).split()
-                                job = match.group(2)
-                                if len(numbers_part) >= 2:
-                                    try:
-                                        straight = round_hours(numbers_part[0])
-                                        overtime = round_hours(numbers_part[1])
-                                        data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
-                                    except:
-                                        continue
+                            parts = line.strip().split()
+                            if len(parts) >= 3:
+                                try:
+                                    # Last value = job number
+                                    job = str(parts[-1])
+                                    # First two values = STRAIGHT, OVERTIME
+                                    straight = round_hours(parts[0])
+                                    overtime = round_hours(parts[1])
+                                    data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
+                                except:
+                                    continue
                 df = pd.DataFrame(data)
             else:
                 continue
@@ -105,3 +102,4 @@ if uploaded_files:
         ">📋 Copy Numbers</button>
         """
         components.html(html_code, height=50)
+
