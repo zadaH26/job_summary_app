@@ -82,7 +82,7 @@ if uploaded_files:
         for job in job_numbers:
             st.subheader(f"Job {job}")
             job_df = export_df[export_df['Job Number']==job].copy()
-            job_df_display = job_df[['DATE','OVERTIME','STRAIGHT']]
+            job_df_display = job_df[['OVERTIME','STRAIGHT']]  # Only numbers columns
             st.dataframe(job_df_display, use_container_width=True)
 
             # -----------------------------
@@ -90,7 +90,7 @@ if uploaded_files:
             # -----------------------------
             numbers_text = ""
             for idx, row in job_df_display.iterrows():
-                numbers_text += f"{row['OVERTIME']}\t{row['STRAIGHT']}\n"
+                numbers_text += f"{row['OVERTIME']:.2f}\t{row['STRAIGHT']:.2f}\n"
             numbers_text = numbers_text.strip()
 
             html_code = f"""
@@ -120,3 +120,4 @@ if uploaded_files:
             file_name="job_summary.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
