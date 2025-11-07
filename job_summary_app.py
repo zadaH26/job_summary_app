@@ -1,27 +1,25 @@
 import streamlit as st
 import pandas as pd
-import streamlit.components.v1 as components
 import pdfplumber
+import streamlit.components.v1 as components
 
-st.title("Job Summary - Weekly Hours Table")
+st.title("Job Summary - Exact Copy Layout")
 
-# Sidebar: rounding increment
-round_increment = st.sidebar.selectbox("Round to:", [0.25, 0.5, 1.0], index=0)
+# Sidebar settings
+round_increment = st.sidebar.selectbox("Round hours to:", [0.25, 0.5, 1.0], index=0)
+num_weeks = 3  # number of rows to show
 
-def round_value(val):
+def round_hours(val):
     try:
         return round(float(val)/round_increment)*round_increment
     except:
         return 0.0
 
-# Upload files
 uploaded_files = st.file_uploader(
-    "Upload CSV, Excel, or PDF files (one per week, up to 5 files)",
-    type=['csv', 'xlsx', 'xls', 'pdf'],
+    "Upload CSV, Excel, or PDF",
+    type=['csv','xlsx','xls','pdf'],
     accept_multiple_files=True
 )
-
-num_weeks = 5  # always show 5 weeks
 
 if uploaded_files:
     jobs = {}
@@ -30,58 +28,65 @@ if uploaded_files:
         week_num = idx + 1
         week_name = f"Week {week_num}"
 
-        # Read file
         try:
             if file.name.endswith('csv'):
                 df = pd.read_csv(file)
             elif file.name.endswith(('xlsx','xls')):
                 df = pd.read_excel(file)
             elif file.name.endswith('pdf'):
-                # Extract tables from PDF
+                text = ""
                 with pdfplumber.open(file) as pdf:
-                    all_tables = []
                     for page in pdf.pages:
-                        for table in page.extract_tables():
-                            all_tables.extend(table)
-                    df = pd.DataFrame(all_tables[1:], columns=all_tables[0])
+                        text += page.extract_text() + "\n"
+                data = []
+                for line in text.split("\n"):
+                    parts = line.strip().split()
+                    if len(parts) >= 3:
+                        try:
+                            job = parts[0]
+                            straight = round_hours(parts[1])
+                            overtime = round_hours(parts[2])
+                            data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
+                        except:
+                            continue
+                df = pd.DataFrame(data)
             else:
-                st.warning(f"Unsupported file: {file.name}")
                 continue
-        except Exception as e:
-            st.error(f"Cannot read file {file.name}: {e}")
+        except:
             continue
 
-        # Process rows
+        # Standardize column names
+        if 'Regular' in df.columns and 'STRAIGHT' not in df.columns:
+            df.rename(columns={'Regular':'STRAIGHT'}, inplace=True)
+        if 'Overtime' in df.columns and 'OVERTIME' not in df.columns:
+            df.rename(columns={'Overtime':'OVERTIME'}, inplace=True)
+
         for _, row in df.iterrows():
-            try:
-                job_number = str(row['Job Number'])
-                straight = round_value(row['Regular'])
-                overtime = round_value(row['Overtime'])
-            except:
-                continue
+            job = str(row['Job Number'] if 'Job Number' in row else row['Job'])
+            straight = round_hours(row['STRAIGHT'])
+            overtime = round_hours(row['OVERTIME'])
 
-            if job_number not in jobs:
-                jobs[job_number] = {}
+            if job not in jobs:
+                jobs[job] = {}
+            jobs[job][week_name] = (overtime, straight)
 
-            jobs[job_number][week_name] = (overtime, straight)
-
-    # Display each job
     for job, weeks in jobs.items():
         st.subheader(f"Job {job}")
         display_rows = []
 
-        for w in range(1, num_weeks+1):
+        # build rows exactly num_weeks
+        for w in range(1,num_weeks+1):
             week_name = f"Week {w}"
             if week_name in weeks:
                 display_rows.append(list(weeks[week_name]))
             else:
-                display_rows.append([0.00, 0.00])
+                display_rows.append([0.0,0.0])
 
-        # Show table as plain text exactly like you want
+        # Display table
         table_str = "\n".join([f"{r[0]:.2f}\t{r[1]:.2f}" for r in display_rows])
-        st.text(table_str)
+        st.text(table_str)  # shows exactly the layout you want
 
-        # One-click copy button
+        # Copy button - one click copy
         html_code = f"""
         <button onclick="
             const text = `{table_str}`;
