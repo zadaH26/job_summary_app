@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 import pdfplumber
 import streamlit.components.v1 as components
+import re
 
 st.title("Job Summary - Exact Copy Layout")
 
-# Sidebar: rounding increment
+# Sidebar settings
 round_increment = st.sidebar.selectbox("Round hours to:", [0.25, 0.5, 1.0], index=0)
-num_weeks = 5  # show 5 weeks
+num_weeks = 3  # number of rows per job
 
 def round_hours(val):
     try:
@@ -34,60 +35,55 @@ if uploaded_files:
             elif file.name.endswith(('xlsx','xls')):
                 df = pd.read_excel(file)
             elif file.name.endswith('pdf'):
-                data = []
+                text = ""
                 with pdfplumber.open(file) as pdf:
                     for page in pdf.pages:
-                        text = page.extract_text()
-                        for line in text.split("\n"):
-                            parts = line.strip().split()
-                            if len(parts) >= 3:
-                                try:
-                                    # Last value = job number
-                                    job = str(parts[-1])
-                                    # First two values = STRAIGHT, OVERTIME
-                                    straight = round_hours(parts[0])
-                                    overtime = round_hours(parts[1])
-                                    data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
-                                except:
-                                    continue
+                        text += page.extract_text() + "\n"
+
+                data = []
+                # Match lines like: "901.75 166.91 1152.12 0.00 N/A 1607"
+                pattern = re.compile(r"([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+).*?(\d+)$")
+                for line in text.split("\n"):
+                    m = pattern.search(line)
+                    if m:
+                        straight = round_hours(m.group(1))
+                        overtime = round_hours(m.group(2))
+                        job = m.group(4)
+                        data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
                 df = pd.DataFrame(data)
             else:
                 continue
         except Exception as e:
-            st.warning(f"Could not read {file.name}: {e}")
+            st.warning(f"Cannot read file {file.name}: {e}")
             continue
 
-        # Standardize column names
+        # Standardize column names for Excel/CSV
         if 'Regular' in df.columns and 'STRAIGHT' not in df.columns:
             df.rename(columns={'Regular':'STRAIGHT'}, inplace=True)
         if 'Overtime' in df.columns and 'OVERTIME' not in df.columns:
             df.rename(columns={'Overtime':'OVERTIME'}, inplace=True)
 
         for _, row in df.iterrows():
-            job = str(row.get('Job Number') or row.get('Job'))
+            job = str(row['Job Number'] if 'Job Number' in row else row['Job'])
             straight = round_hours(row['STRAIGHT'])
             overtime = round_hours(row['OVERTIME'])
-
-            # Only keep jobs with non-zero hours
-            if straight == 0.0 and overtime == 0.0:
-                continue
 
             if job not in jobs:
                 jobs[job] = {}
             jobs[job][week_name] = (overtime, straight)
 
-    # Display each job
+    # Display tables
     for job, weeks in jobs.items():
         st.subheader(f"Job {job}")
         display_rows = []
 
-        # Ensure exactly num_weeks rows
-        for w in range(1, num_weeks+1):
+        # Build rows for num_weeks
+        for w in range(1,num_weeks+1):
             week_name = f"Week {w}"
             if week_name in weeks:
                 display_rows.append(list(weeks[week_name]))
             else:
-                display_rows.append([0.0, 0.0])
+                display_rows.append([0.0,0.0])
 
         # Display table exactly like you want
         table_str = "\n".join([f"{r[0]:.2f}\t{r[1]:.2f}" for r in display_rows])
@@ -102,4 +98,3 @@ if uploaded_files:
         ">📋 Copy Numbers</button>
         """
         components.html(html_code, height=50)
-
