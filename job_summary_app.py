@@ -3,29 +3,30 @@ import pandas as pd
 import pdfplumber
 import streamlit.components.v1 as components
 
-st.title("Job Summary Fixed Output")
+st.title("Job Summary - Only Two Columns Display")
 
+# Settings
 round_increment = st.sidebar.selectbox("Round hours to:", [0.25, 0.5, 1.0], index=0)
-num_weeks = 3
+num_weeks = 3  # Always 3 rows
 
 def round_hours(val):
     try:
-        return round(float(val) / round_increment) * round_increment
+        return round(float(val)/round_increment)*round_increment
     except:
         return 0.0
 
 uploaded_files = st.file_uploader(
-    "Upload CSV, Excel or PDF files",
+    "Upload CSV, Excel, or PDF",
     type=['csv','xlsx','xls','pdf'],
     accept_multiple_files=True
 )
 
 if uploaded_files:
-    # Store data per job
     jobs = {}
 
     for idx, file in enumerate(uploaded_files):
-        week_name = f"Week {idx+1}"
+        week_num = idx+1
+        week_name = f"Week {week_num}"
 
         try:
             if file.name.endswith('csv'):
@@ -69,23 +70,25 @@ if uploaded_files:
                 jobs[job] = {}
             jobs[job][week_name] = (overtime, straight)
 
-    # Display
+    # Display jobs
     for job, weeks in jobs.items():
         st.subheader(f"Job {job}")
         display_rows = []
 
-        for w in range(1, num_weeks+1):
+        # Ensure exactly num_weeks rows
+        for w in range(1,num_weeks+1):
             week_name = f"Week {w}"
             if week_name in weeks:
                 display_rows.append(list(weeks[week_name]))
             else:
                 display_rows.append([0.0, 0.0])
 
+        # Create a DataFrame with ONLY 2 columns
         df_display = pd.DataFrame(display_rows, columns=['OVERTIME','STRAIGHT'])
         st.dataframe(df_display, use_container_width=True)
 
         # Copy button
-        numbers_text = "\n".join([f"{r[0]:.2f}    {r[1]:.2f}" for r in display_rows])
+        numbers_text = "\n".join([f"{row[0]:.2f}    {row[1]:.2f}" for row in display_rows])
         html_code = f"""
         <textarea id="copy{job}" style="position:absolute; left:-1000px; top:-1000px;">{numbers_text}</textarea>
         <button onclick="
@@ -93,6 +96,6 @@ if uploaded_files:
             copyText.select();
             navigator.clipboard.writeText(copyText.value);
             alert('Copied!');
-        ">📋 Copy</button>
+        ">📋 Copy Numbers</button>
         """
         components.html(html_code, height=50)
