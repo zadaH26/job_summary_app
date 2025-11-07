@@ -32,7 +32,7 @@ if uploaded_files:
 
     for file in uploaded_files:
         filename = file.name
-        week_name = filename.split('.')[0]  # Use filename as week label
+        week_name = filename.split('.')[0]
         try:
             if filename.endswith(('csv')):
                 df = pd.read_csv(file)
@@ -86,7 +86,7 @@ if uploaded_files:
             st.dataframe(job_df_display, use_container_width=True)
 
             # -----------------------------
-            # One-click copy button using HTML/JS
+            # One-click copy button (numbers only)
             # -----------------------------
             numbers_text = ""
             for idx, row in job_df_display.iterrows():
@@ -120,4 +120,3 @@ if uploaded_files:
             file_name="job_summary.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
