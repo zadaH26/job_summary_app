@@ -8,7 +8,7 @@ st.title("Job Summary - Exact Copy Layout")
 
 # Sidebar: rounding increment
 round_increment = st.sidebar.selectbox("Round hours to:", [0.25, 0.5, 1.0], index=0)
-num_weeks = 3  # default number of rows per job
+num_weeks = 5  # show 5 weeks
 
 def round_hours(val):
     try:
@@ -16,7 +16,6 @@ def round_hours(val):
     except:
         return 0.0
 
-# Upload files
 uploaded_files = st.file_uploader(
     "Upload CSV, Excel, or PDF",
     type=['csv','xlsx','xls','pdf'],
@@ -41,27 +40,19 @@ if uploaded_files:
                     for page in pdf.pages:
                         text = page.extract_text()
                         for line in text.split("\n"):
-                            # Try to detect lines with numeric Regular and Overtime
-                            parts = line.strip().split()
-                            if len(parts) < 3:
-                                continue
-                            # Attempt to parse numbers from the line
-                            numbers = []
-                            for p in parts:
-                                try:
-                                    numbers.append(float(p))
-                                except:
-                                    pass
-                            if len(numbers) >= 2:
-                                # Last number is job number OR first number? detect
-                                overtime, straight = numbers[0], numbers[1]
-                                # Try to detect job number
-                                job_match = re.search(r'\b\d{3,5}\b', line)
-                                if job_match:
-                                    job = job_match.group()
-                                    straight = round_hours(straight)
-                                    overtime = round_hours(overtime)
-                                    data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
+                            line = line.strip()
+                            # Only parse lines ending with job number
+                            match = re.match(r'^(.*?)\s+(\d{3,5})$', line)
+                            if match:
+                                numbers_part = match.group(1).split()
+                                job = match.group(2)
+                                if len(numbers_part) >= 2:
+                                    try:
+                                        straight = round_hours(numbers_part[0])
+                                        overtime = round_hours(numbers_part[1])
+                                        data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
+                                    except:
+                                        continue
                 df = pd.DataFrame(data)
             else:
                 continue
@@ -93,7 +84,7 @@ if uploaded_files:
         st.subheader(f"Job {job}")
         display_rows = []
 
-        # Ensure always num_weeks rows
+        # Ensure exactly num_weeks rows
         for w in range(1, num_weeks+1):
             week_name = f"Week {w}"
             if week_name in weeks:
@@ -114,4 +105,3 @@ if uploaded_files:
         ">📋 Copy Numbers</button>
         """
         components.html(html_code, height=50)
-
