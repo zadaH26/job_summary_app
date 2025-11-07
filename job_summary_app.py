@@ -3,11 +3,11 @@ import pandas as pd
 import pdfplumber
 import streamlit.components.v1 as components
 
-st.title("Job Summary - Only Two Columns Display")
+st.title("Job Summary - Exact Copy Layout")
 
-# Settings
+# Sidebar settings
 round_increment = st.sidebar.selectbox("Round hours to:", [0.25, 0.5, 1.0], index=0)
-num_weeks = 3  # Always 3 rows
+num_weeks = 3  # number of rows to show
 
 def round_hours(val):
     try:
@@ -25,7 +25,7 @@ if uploaded_files:
     jobs = {}
 
     for idx, file in enumerate(uploaded_files):
-        week_num = idx+1
+        week_num = idx + 1
         week_name = f"Week {week_num}"
 
         try:
@@ -70,31 +70,27 @@ if uploaded_files:
                 jobs[job] = {}
             jobs[job][week_name] = (overtime, straight)
 
-    # Display jobs
     for job, weeks in jobs.items():
         st.subheader(f"Job {job}")
         display_rows = []
 
-        # Ensure exactly num_weeks rows
+        # build rows exactly num_weeks
         for w in range(1,num_weeks+1):
             week_name = f"Week {w}"
             if week_name in weeks:
                 display_rows.append(list(weeks[week_name]))
             else:
-                display_rows.append([0.0, 0.0])
+                display_rows.append([0.0,0.0])
 
-        # Create a DataFrame with ONLY 2 columns
-        df_display = pd.DataFrame(display_rows, columns=['OVERTIME','STRAIGHT'])
-        st.dataframe(df_display, use_container_width=True)
+        # Display table
+        table_str = "\n".join([f"{r[0]:.2f}\t{r[1]:.2f}" for r in display_rows])
+        st.text(table_str)  # shows exactly the layout you want
 
-        # Copy button
-        numbers_text = "\n".join([f"{row[0]:.2f}    {row[1]:.2f}" for row in display_rows])
+        # Copy button - one click copy
         html_code = f"""
-        <textarea id="copy{job}" style="position:absolute; left:-1000px; top:-1000px;">{numbers_text}</textarea>
         <button onclick="
-            var copyText = document.getElementById('copy{job}');
-            copyText.select();
-            navigator.clipboard.writeText(copyText.value);
+            const text = `{table_str}`;
+            navigator.clipboard.writeText(text);
             alert('Copied!');
         ">📋 Copy Numbers</button>
         """
