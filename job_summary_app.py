@@ -81,15 +81,19 @@ if uploaded_files:
 
         for job in job_numbers:
             st.subheader(f"Job {job}")
-            job_df = export_df[export_df['Job Number']==job].copy()
-            job_df_display = job_df[['OVERTIME','STRAIGHT']]  # Only numbers columns
-            st.dataframe(job_df_display, use_container_width=True)
+            # Only select rows for this job and columns OVERTIME & STRAIGHT
+            job_df = export_df[export_df['Job Number']==job][['OVERTIME','STRAIGHT']].copy()
+
+            # Remove any all-zero rows at the bottom
+            job_df = job_df[(job_df['OVERTIME'] != 0) | (job_df['STRAIGHT'] != 0)]
+
+            st.dataframe(job_df, use_container_width=True)
 
             # -----------------------------
-            # One-click copy button (numbers only with spaces)
+            # One-click copy button (numbers only, proper layout)
             # -----------------------------
             numbers_text = ""
-            for idx, row in job_df_display.iterrows():
+            for _, row in job_df.iterrows():
                 numbers_text += f"{row['OVERTIME']:.2f}    {row['STRAIGHT']:.2f}\n"
             numbers_text = numbers_text.strip()
 
