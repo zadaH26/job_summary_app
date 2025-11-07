@@ -8,7 +8,7 @@ st.title("Job Summary - Exact Copy Layout")
 
 # Sidebar: rounding increment
 round_increment = st.sidebar.selectbox("Round hours to:", [0.25, 0.5, 1.0], index=0)
-num_weeks = 3  # number of rows per job to show
+num_weeks = 3  # default number of rows per job
 
 def round_hours(val):
     try:
@@ -41,13 +41,27 @@ if uploaded_files:
                     for page in pdf.pages:
                         text = page.extract_text()
                         for line in text.split("\n"):
-                            # look for lines starting with numbers (job numbers)
-                            match = re.match(r"^\s*(\d+)\s+([\d.]+)\s+([\d.]+)", line)
-                            if match:
-                                job = match.group(1)
-                                straight = round_hours(match.group(2))
-                                overtime = round_hours(match.group(3))
-                                data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
+                            # Try to detect lines with numeric Regular and Overtime
+                            parts = line.strip().split()
+                            if len(parts) < 3:
+                                continue
+                            # Attempt to parse numbers from the line
+                            numbers = []
+                            for p in parts:
+                                try:
+                                    numbers.append(float(p))
+                                except:
+                                    pass
+                            if len(numbers) >= 2:
+                                # Last number is job number OR first number? detect
+                                overtime, straight = numbers[0], numbers[1]
+                                # Try to detect job number
+                                job_match = re.search(r'\b\d{3,5}\b', line)
+                                if job_match:
+                                    job = job_match.group()
+                                    straight = round_hours(straight)
+                                    overtime = round_hours(overtime)
+                                    data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
                 df = pd.DataFrame(data)
             else:
                 continue
@@ -65,6 +79,10 @@ if uploaded_files:
             job = str(row.get('Job Number') or row.get('Job'))
             straight = round_hours(row['STRAIGHT'])
             overtime = round_hours(row['OVERTIME'])
+
+            # Only keep jobs with non-zero hours
+            if straight == 0.0 and overtime == 0.0:
+                continue
 
             if job not in jobs:
                 jobs[job] = {}
@@ -96,3 +114,4 @@ if uploaded_files:
         ">📋 Copy Numbers</button>
         """
         components.html(html_code, height=50)
+
