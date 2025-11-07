@@ -5,9 +5,9 @@ import streamlit.components.v1 as components
 
 st.title("Job Summary - Exact Copy Layout")
 
-# Sidebar settings
+# Sidebar: round increment
 round_increment = st.sidebar.selectbox("Round hours to:", [0.25, 0.5, 1.0], index=0)
-num_weeks = 5  # show 5 weeks by default
+num_weeks = 5  # default to 5 weeks
 
 def round_hours(val):
     try:
@@ -34,24 +34,21 @@ if uploaded_files:
             elif file.name.endswith(('xlsx','xls')):
                 df = pd.read_excel(file)
             elif file.name.endswith('pdf'):
+                # Extract table-like lines
                 text = ""
                 with pdfplumber.open(file) as pdf:
                     for page in pdf.pages:
                         text += page.extract_text() + "\n"
-
                 data = []
                 for line in text.split("\n"):
                     parts = line.strip().split()
-                    if len(parts) < 3:
+                    if len(parts) < 2:
                         continue
-
-                    # Attempt to parse numeric values
+                    # Try to detect Job Number as last numeric token
+                    job_candidate = parts[-1]
                     try:
-                        # Last element is job number
-                        job_candidate = parts[-1]
-                        if not job_candidate.isdigit():
-                            continue  # skip non-numeric job numbers
-                        job = job_candidate
+                        job = str(int(job_candidate))
+                        # STRAIGHT = first number, OVERTIME = second number (based on your sample)
                         straight = round_hours(parts[0])
                         overtime = round_hours(parts[1])
                         data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
@@ -68,14 +65,16 @@ if uploaded_files:
             df.rename(columns={'Regular':'STRAIGHT'}, inplace=True)
         if 'Overtime' in df.columns and 'OVERTIME' not in df.columns:
             df.rename(columns={'Overtime':'OVERTIME'}, inplace=True)
+        if 'Job Number' in df.columns:
+            df.rename(columns={'Job Number':'Job'}, inplace=True)
 
         for _, row in df.iterrows():
             try:
-                job = str(row['Job Number'] if 'Job Number' in row else row['Job'])
+                job = str(row['Job'])
                 straight = round_hours(row['STRAIGHT'])
                 overtime = round_hours(row['OVERTIME'])
-                # Skip rows where job is non-numeric or empty
-                if not job.isdigit() or (straight == 0.0 and overtime == 0.0):
+                # Skip rows with invalid job
+                if not job.isdigit():
                     continue
             except:
                 continue
@@ -88,25 +87,6 @@ if uploaded_files:
     for job, weeks in jobs.items():
         st.subheader(f"Job {job}")
         display_rows = []
-
-        # build rows exactly num_weeks
-        for w in range(1,num_weeks+1):
+        for w in range(1, num_weeks+1):
             week_name = f"Week {w}"
-            if week_name in weeks:
-                display_rows.append(list(weeks[week_name]))
-            else:
-                display_rows.append([0.0,0.0])
-
-        # Display table exactly like you want
-        table_str = "\n".join([f"{r[0]:.2f}\t{r[1]:.2f}" for r in display_rows])
-        st.text(table_str)
-
-        # Copy button - one click copy
-        html_code = f"""
-        <button onclick="
-            const text = `{table_str}`;
-            navigator.clipboard.writeText(text);
-            alert('Copied!');
-        ">📋 Copy Numbers</button>
-        """
-        components.html(html_code, height=50)
+            if week_name in weeks:_
