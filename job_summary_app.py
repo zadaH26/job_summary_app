@@ -1,198 +1,123 @@
 import streamlit as st
 import pandas as pd
 import pdfplumber
-import io
-import re
-from decimal import Decimal, ROUND_HALF_UP
 import streamlit.components.v1 as components
 
-# -------------------------------
-# Helper functions
-# -------------------------------
+# -------------------
+# Sidebar settings
+# -------------------
+st.sidebar.header("Settings")
+round_increment = st.sidebar.selectbox("Round hours to:", [0.25, 0.5, 1.0], index=0)
 
-def round_hours(x, increment):
+def round_hours(value, increment):
     try:
-        x = Decimal(str(x))
-        increment = Decimal(str(increment))
-        rounded = (x / increment).quantize(Decimal('1'), rounding=ROUND_HALF_UP) * increment
-        return float(rounded)
-    except Exception:
+        return round(float(value) / increment) * increment
+    except:
         return 0.0
 
-def extract_text_from_pdf(file):
-    text = ""
-    with pdfplumber.open(file) as pdf:
-        for page in pdf.pages:
-            content = page.extract_text()
-            if content:
-                text += content + "\n"
-    return text
-
-def parse_text_to_df(text):
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    rows = []
-    for line in lines:
-        parts = line.split()
-        if len(parts) >= 3:
-            try:
-                job = parts[0]
-                regular = float(parts[1])
-                overtime = float(parts[2])
-                rows.append({"Job Number": job, "STRAIGHT": regular, "OVERTIME": overtime})
-            except:
-                continue
-    if rows:
-        return pd.DataFrame(rows)
-    else:
-        return pd.DataFrame(columns=["Job Number", "STRAIGHT", "OVERTIME"])
-
-def process_file(file, file_type, rounding_increment):
-    if file_type == "csv":
-        df = pd.read_csv(file)
-    elif file_type in ["xlsx", "xls"]:
-        df = pd.read_excel(file)
-    elif file_type == "pdf":
-        text = extract_text_from_pdf(file)
-        df = parse_text_to_df(text)
-        return df
-    else:
-        return pd.DataFrame(columns=["Job Number", "STRAIGHT", "OVERTIME"])
-
-    df.columns = [c.strip().lower() for c in df.columns]
-
-    if "job number" not in df.columns:
-        df = parse_text_to_df(df.to_string())
-        return df
-
-    if "regular" in df.columns:
-        df = df.rename(columns={"regular": "STRAIGHT"})
-    if "overtime" in df.columns:
-        df = df.rename(columns={"overtime": "OVERTIME"})
-
-    df["STRAIGHT"] = pd.to_numeric(df.get("STRAIGHT", 0), errors='coerce').fillna(0)
-    df["OVERTIME"] = pd.to_numeric(df.get("OVERTIME", 0), errors='coerce').fillna(0)
-
-    df["STRAIGHT"] = df["STRAIGHT"].apply(lambda x: round_hours(x, rounding_increment))
-    df["OVERTIME"] = df["OVERTIME"].apply(lambda x: round_hours(x, rounding_increment))
-
-    return df[["Job Number", "STRAIGHT", "OVERTIME"]]
-
-def detect_week_number(filename, default_index):
-    match = re.search(r"week[_\s]?(\d+)", filename, re.IGNORECASE)
-    if match:
-        return f"Week {int(match.group(1))}"
-    else:
-        return f"Week {default_index + 1}"
-
-# -------------------------------
-# Streamlit UI
-# -------------------------------
-
-st.set_page_config(page_title="Job Summary App", layout="wide")
-st.title("📊 Job Summary to Weekly Hours")
-
-st.markdown("""
-Upload CSV, Excel, or PDF files for multiple weeks.  
-The app will extract Job Number, Straight (Regular), and Overtime hours,  
-round them to your chosen increment, and display weekly summaries.
-""")
-
-# Rounding selector
-rounding_increment = st.selectbox(
-    "Select rounding increment (hours):",
-    options=[0.25, 0.5, 1.0],
-    index=0
-)
+# -------------------
+# File uploader
+# -------------------
+st.title("Job Summary to Weekly Hours")
 
 uploaded_files = st.file_uploader(
-    "Choose files (CSV, Excel, PDF)",
-    type=["csv", "xlsx", "xls", "pdf"],
+    "Upload your reports (CSV, Excel, PDF)", 
+    type=['csv', 'xlsx', 'xls', 'pdf'], 
     accept_multiple_files=True
 )
 
 if uploaded_files:
-    all_weeks = {}
-    for i, file in enumerate(uploaded_files):
-        week_num = detect_week_number(file.name, i)
-        file_ext = file.name.split(".")[-1].lower()
-        df = process_file(file, file_ext, rounding_increment)
-        if not df.empty:
-            all_weeks[week_num] = df
 
-    if all_weeks:
-        st.success("✅ Files processed successfully!")
+    all_data = []
 
-        def week_sort_key(w):
-            match = re.search(r"Week (\d+)", w)
-            return int(match.group(1)) if match else 0
+    for file in uploaded_files:
+        filename = file.name
+        week_name = filename.split('.')[0]  # Use filename as week label
+        try:
+            if filename.endswith(('csv')):
+                df = pd.read_csv(file)
+            elif filename.endswith(('xlsx', 'xls')):
+                df = pd.read_excel(file)
+            elif filename.endswith('pdf'):
+                text = ""
+                with pdfplumber.open(file) as pdf:
+                    for page in pdf.pages:
+                        text += page.extract_text() + "\n"
+                lines = text.split("\n")
+                data = []
+                for line in lines:
+                    parts = line.strip().split()
+                    if len(parts) >= 3:
+                        try:
+                            job_num = parts[0]
+                            reg = float(parts[1])
+                            ot = float(parts[2])
+                            data.append({"Job Number": job_num, "STRAIGHT": reg, "OVERTIME": ot})
+                        except:
+                            continue
+                df = pd.DataFrame(data)
+            else:
+                continue
+        except Exception as e:
+            st.warning(f"Could not read {filename}: {e}")
+            continue
 
-        sorted_weeks = sorted(all_weeks.keys(), key=week_sort_key)
-        job_numbers = sorted({job for week in all_weeks.values() for job in week["Job Number"]})
+        # Ensure columns exist
+        if 'STRAIGHT' not in df.columns and 'Regular' in df.columns:
+            df.rename(columns={'Regular':'STRAIGHT'}, inplace=True)
+        if 'OVERTIME' not in df.columns and 'Overtime' in df.columns:
+            df.rename(columns={'Overtime':'OVERTIME'}, inplace=True)
 
-        export_rows = []
+        # Round values
+        df['STRAIGHT'] = df['STRAIGHT'].apply(lambda x: round_hours(x, round_increment))
+        df['OVERTIME'] = df['OVERTIME'].apply(lambda x: round_hours(x, round_increment))
 
-        # Display results
+        df['DATE'] = week_name
+        all_data.append(df[['Job Number','DATE','OVERTIME','STRAIGHT']])
+
+    if all_data:
+        export_df = pd.concat(all_data, ignore_index=True)
+        job_numbers = export_df['Job Number'].unique()
+
         for job in job_numbers:
             st.subheader(f"Job {job}")
-            table_data = []
-            table_copy_text = ""
+            job_df = export_df[export_df['Job Number']==job].copy()
+            job_df_display = job_df[['DATE','OVERTIME','STRAIGHT']]
+            st.dataframe(job_df_display, use_container_width=True)
 
-            for week_name in sorted_weeks:
-                df = all_weeks[week_name]
-                job_row = df[df["Job Number"] == job]
-                if not job_row.empty:
-                    straight = float(job_row.iloc[0]["STRAIGHT"])
-                    overtime = float(job_row.iloc[0]["OVERTIME"])
-                else:
-                    straight = 0.0
-                    overtime = 0.0
+            # -----------------------------
+            # One-click copy button using HTML/JS
+            # -----------------------------
+            numbers_text = ""
+            for idx, row in job_df_display.iterrows():
+                numbers_text += f"{row['OVERTIME']}\t{row['STRAIGHT']}\n"
+            numbers_text = numbers_text.strip()
 
-                straight = round_hours(straight, rounding_increment)
-                overtime = round_hours(overtime, rounding_increment)
-
-                table_data.append({
-                    "DATE": week_name,
-                    "STRAIGHT": straight,
-                    "OVERTIME": overtime
-                })
-                export_rows.append({
-                    "Job Number": job,
-                    "DATE": week_name,
-                    "STRAIGHT": straight,
-                    "OVERTIME": overtime
-                })
-
-                table_copy_text += f"{week_name}\t{straight}\t{overtime}\n"
-
-            df_table = pd.DataFrame(table_data)
-            st.dataframe(df_table)
-
-            # --- One-click Copy per table ---
-            js_code = f"""
-            <textarea id="copyText_{job}" style="opacity:0; height:0;">{table_copy_text}</textarea>
-            <button onclick="var copyText = document.getElementById('copyText_{job}'); copyText.select(); document.execCommand('copy'); alert('✅ Table for Job {job} copied!');">📋 Copy Table</button>
+            html_code = f"""
+            <input type="text" value="{numbers_text}" id="copyInput{job}" style="position:absolute; left:-1000px; top:-1000px;">
+            <button onclick="
+                var copyText = document.getElementById('copyInput{job}');
+                copyText.select();
+                copyText.setSelectionRange(0, 99999);
+                navigator.clipboard.writeText(copyText.value);
+                alert('Copied to clipboard!');
+            ">📋 Copy Numbers</button>
             """
-            components.html(js_code, height=50)
+            components.html(html_code, height=50)
 
+        # -----------------------------
         # Export buttons
-        export_df = pd.DataFrame(export_rows)
-
+        # -----------------------------
         st.download_button(
             label="⬇️ Download as CSV",
             data=export_df.to_csv(index=False).encode("utf-8"),
             file_name="job_summary.csv",
             mime="text/csv"
         )
-
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            export_df.to_excel(writer, index=False, sheet_name="Job Summary")
-            writer.save()
-            processed_data = output.getvalue()
-
         st.download_button(
             label="⬇️ Download as Excel",
-            data=processed_data,
+            data=export_df.to_excel(index=False, engine='openpyxl'),
             file_name="job_summary.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
