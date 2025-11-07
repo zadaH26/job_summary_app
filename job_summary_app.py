@@ -8,6 +8,7 @@ import streamlit.components.v1 as components
 # -------------------
 st.sidebar.header("Settings")
 round_increment = st.sidebar.selectbox("Round hours to:", [0.25, 0.5, 1.0], index=0)
+num_weeks = 3  # always show 3 rows for Week 1-3
 
 def round_hours(value, increment):
     try:
@@ -30,15 +31,15 @@ if uploaded_files:
 
     all_data = []
 
-    for file in uploaded_files:
-        filename = file.name
-        week_name = filename.split('.')[0]
+    for idx, file in enumerate(uploaded_files):
+        week_num = idx + 1
+        week_name = f"Week {week_num}"
         try:
-            if filename.endswith(('csv')):
+            if file.name.endswith('csv'):
                 df = pd.read_csv(file)
-            elif filename.endswith(('xlsx', 'xls')):
+            elif file.name.endswith(('xlsx', 'xls')):
                 df = pd.read_excel(file)
-            elif filename.endswith('pdf'):
+            elif file.name.endswith('pdf'):
                 text = ""
                 with pdfplumber.open(file) as pdf:
                     for page in pdf.pages:
@@ -59,7 +60,7 @@ if uploaded_files:
             else:
                 continue
         except Exception as e:
-            st.warning(f"Could not read {filename}: {e}")
+            st.warning(f"Could not read {file.name}: {e}")
             continue
 
         # Ensure columns exist
@@ -81,19 +82,33 @@ if uploaded_files:
 
         for job in job_numbers:
             st.subheader(f"Job {job}")
-            # Only select rows for this job and columns OVERTIME & STRAIGHT
-            job_df = export_df[export_df['Job Number']==job][['OVERTIME','STRAIGHT']].copy()
 
-            # Remove any all-zero rows at the bottom
-            job_df = job_df[(job_df['OVERTIME'] != 0) | (job_df['STRAIGHT'] != 0)]
-
-            st.dataframe(job_df, use_container_width=True)
+            job_df = export_df[export_df['Job Number']==job].copy()
 
             # -----------------------------
-            # One-click copy button (numbers only, proper layout)
+            # Make sure we always have num_weeks rows
+            # -----------------------------
+            display_rows = []
+            for week_idx in range(1, num_weeks+1):
+                week_name = f"Week {week_idx}"
+                row = job_df[job_df['DATE']==week_name]
+                if not row.empty:
+                    ot = row['OVERTIME'].sum()
+                    st_hours = row['STRAIGHT'].sum()
+                else:
+                    ot = 0.0
+                    st_hours = 0.0
+                display_rows.append({"OVERTIME": ot, "STRAIGHT": st_hours})
+
+            job_df_display = pd.DataFrame(display_rows)
+
+            st.dataframe(job_df_display, use_container_width=True)
+
+            # -----------------------------
+            # One-click copy button
             # -----------------------------
             numbers_text = ""
-            for _, row in job_df.iterrows():
+            for _, row in job_df_display.iterrows():
                 numbers_text += f"{row['OVERTIME']:.2f}    {row['STRAIGHT']:.2f}\n"
             numbers_text = numbers_text.strip()
 
