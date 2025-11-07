@@ -7,7 +7,7 @@ st.title("Job Summary - Exact Copy Layout")
 
 # Sidebar settings
 round_increment = st.sidebar.selectbox("Round hours to:", [0.25, 0.5, 1.0], index=0)
-num_weeks = 3  # number of rows to show
+num_weeks = 5  # show 5 weeks by default
 
 def round_hours(val):
     try:
@@ -44,14 +44,16 @@ if uploaded_files:
                     parts = line.strip().split()
                     if len(parts) < 3:
                         continue
-                    # Only keep rows where first 3 parts are numbers
+
+                    # Attempt to parse numeric values
                     try:
-                        job = parts[-1]  # last element is job number in your PDFs
+                        # Last element is job number
+                        job_candidate = parts[-1]
+                        if not job_candidate.isdigit():
+                            continue  # skip non-numeric job numbers
+                        job = job_candidate
                         straight = round_hours(parts[0])
                         overtime = round_hours(parts[1])
-                        # Skip rows with zeros for both (like totals or empty)
-                        if straight == 0.0 and overtime == 0.0:
-                            continue
                         data.append({"Job": job, "STRAIGHT": straight, "OVERTIME": overtime})
                     except:
                         continue
@@ -72,8 +74,8 @@ if uploaded_files:
                 job = str(row['Job Number'] if 'Job Number' in row else row['Job'])
                 straight = round_hours(row['STRAIGHT'])
                 overtime = round_hours(row['OVERTIME'])
-                # Skip rows where job is empty or non-numeric
-                if job.strip() == "" or (straight == 0.0 and overtime == 0.0):
+                # Skip rows where job is non-numeric or empty
+                if not job.isdigit() or (straight == 0.0 and overtime == 0.0):
                     continue
             except:
                 continue
@@ -95,9 +97,9 @@ if uploaded_files:
             else:
                 display_rows.append([0.0,0.0])
 
-        # Display table
+        # Display table exactly like you want
         table_str = "\n".join([f"{r[0]:.2f}\t{r[1]:.2f}" for r in display_rows])
-        st.text(table_str)  # shows exactly the layout you want
+        st.text(table_str)
 
         # Copy button - one click copy
         html_code = f"""
